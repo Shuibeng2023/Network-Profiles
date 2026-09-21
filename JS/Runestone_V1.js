@@ -1,131 +1,158 @@
-/*
- * 极致精简版 JS 覆写脚本 V1
- *
- * 逻辑：
- * 1. 继承机场订阅解析出来的所有节点 (config.proxies)。
- * 2. 覆盖原有的复杂分流，只保留“日本节点自动优选”与“国内直连”。
- * 3. 剩余所有海外流量（Google, YouTube, Gemini, TikTok 等）全部默认走日本节点。
- */
-
 function main(config) {
-  // 1. 提取机场订阅解析后的动态节点
-  const proxies = Array.isArray(config && config.proxies) ? config.proxies : [];
+  // 基础防御
+  if (!config) config = {};
+  if (!Array.isArray(config.proxies)) config.proxies = [];
 
-  // 2. 极简固定配置
-  const fixed = {
-    "mixed-port": 7890,
-    "allow-lan": false,
-    "bind-address": "*",
-    "mode": "rule",
-    "log-level": "info",
-    "external-controller": "127.0.0.1:9090",
-    "unified-delay": true,
-    "tcp-concurrent": true,
-    "ipv6": false,
-    "tun": {
-      "enable": true,
-      "stack": "gvisor",
-      "auto-route": true,
-      "auto-detect-interface": true,
-      "strict-route": true,
-      "dns-hijack": ["any:53"]
-    },
-    "dns": {
-      "enable": true,
-      "respect-rules": true,
-      "ipv6": false,
-      "enhanced-mode": "fake-ip",
-      "fake-ip-range": "198.18.0.1/16",
-      "default-nameserver": ["223.5.5.5", "119.29.29.29"],
-      "nameserver": [
-        "https://dns.google/dns-query",
-        "https://1.1.1.1/dns-query"
-      ],
-      "direct-nameserver": [
+  // ==================== 基础设置 ====================
+  config.mode = "rule";
+  config["log-level"] = "warning";
+  config.ipv6 = true;
+  config["unified-delay"] = true;
+  config["tcp-concurrent"] = true;
+
+  // ==================== TUN + MIPS ====================
+  config.tun = {
+    enable: true,
+    stack: "mips",
+    "auto-route": true,
+    "auto-detect-interface": true,
+    "strict-route": true,
+    "dns-hijack": ["any:53"]
+  };
+
+  config.profile = {
+    "store-selected": true,
+    "store-fake-ip": true
+  };
+
+  // ==================== 优化版 DNS ====================
+  config.dns = {
+    enable: true,
+    ipv6: false,
+    "enhanced-mode": "fake-ip",
+    "fake-ip-range": "198.18.0.1/16",
+    "respect-rules": true,
+
+    "default-nameserver": [
+      "223.5.5.5",
+      "119.29.29.29",
+      "1.1.1.1"
+    ],
+
+    nameserver: [
+      "https://dns.alidns.com/dns-query",
+      "https://doh.pub/dns-query"
+    ],
+
+    "proxy-server-nameserver": [
+      "223.5.5.5",
+      "119.29.29.29"
+    ],
+
+    "direct-nameserver": [
+      "https://dns.alidns.com/dns-query",
+      "https://doh.pub/dns-query"
+    ],
+
+    "nameserver-policy": {
+      "geosite:cn": [
         "https://dns.alidns.com/dns-query",
         "https://doh.pub/dns-query"
       ],
-      "fake-ip-filter": [
-        "*.lan",
-        "*.local",
-        "localhost",
-        "*.msftconnecttest.com",
-        "*.msftncsi.com",
-        "captive.apple.com",
-        "+.weixin.com",
-        "+.wechat.com"
+      "geosite:private": "system"          // 内网域名走系统 DNS
+    },
+
+    fallback: [
+      "https://dns.cloudflare.com/dns-query",
+      "https://dns.google/dns-query"
+    ],
+
+    "fallback-filter": {
+      geoip: true,
+      "geoip-code": "CN",
+      ipcidr: [
+        "240.0.0.0/4",
+        "0.0.0.0/32",
+        "127.0.0.0/8"
       ]
     },
-    "profile": {
-      "store-selected": true,
-      "store-fake-ip": true
-    },
-    
-    // ==================== 策略组（极简化） ====================
-    "proxy-groups": [
-      {
-        "name": "节点选择",
-        "type": "select",
-        "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure/IconSet/Color/Global.png",
-        "proxies": ["🇯🇵 JP-Auto", "⚡ 自动选择", "DIRECT"]
-      },
-      {
-        "name": "🇯🇵 JP-Auto",
-        "type": "url-test",
-        "include-all": true,
-        "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure/IconSet/Color/Japan.png",
-        "filter": "(?i)(\\[JP\\]|^JP$|Japan|\\bJP\\b|日本|东京|大阪|🇯🇵)",
-        "url": "http://www.gstatic.com/generate_204",
-        "interval": 600,
-        "tolerance": 100
-      },
-      {
-        "name": "⚡ 自动选择",
-        "type": "url-test",
-        "include-all": true,
-        "icon": "https://fastly.jsdelivr.net/gh/Koolson/Qure/IconSet/Color/Auto.png",
-        "filter": "^(?!.*(官网|到期|流量|倍率|剩余|重置|客服|群)).*",
-        "url": "http://www.gstatic.com/generate_204",
-        "interval": 600,
-        "tolerance": 100
-      }
-    ],
 
-    // ==================== 分流规则（极简化） ====================
-    "rules": [
-      // 1. 局域网直连
-      "IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
-      "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
-      "IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
-      "IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
-      "GEOIP,LAN,DIRECT,no-resolve",
-
-      // 2. 国内服务与国内 IP 直连
-      "RULE-SET,ChinaMax,DIRECT",
-      "GEOSITE,CN,DIRECT",
-      "GEOIP,CN,DIRECT,no-resolve",
-
-      // 3. 所有剩余流量（含 Gemini, TikTok, 油管等）全部走日本节点出口
-      "MATCH,节点选择"
-    ],
-
-    // ==================== 规则集定义 ====================
-    "rule-providers": {
-      "ChinaMax": {
-        "type": "http",
-        "behavior": "classical",
-        "format": "yaml",
-        "interval": 86400,
-        "url": "https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/refs/heads/master/rule/Clash/ChinaMax/ChinaMax.yaml"
-      }
-    }
+    "fake-ip-filter": [
+      "*.lan",
+      "*.local",
+      "localhost",
+      "*.msftconnecttest.com",
+      "*.msftncsi.com",
+      "captive.apple.com",
+      "*.push.apple.com",
+      "stun.*",
+      "+.stun.*.*",
+      "+.weixin.com",
+      "+.wechat.com",
+      "+.qq.com",
+      "+.tencent.com"
+    ]
   };
 
-  // 3. 注入机场节点
-  fixed.proxies = proxies;
+  // ==================== 策略组（完整空组防护） ====================
+  const jpRegex = /🇯🇵|JP|Japan|日本|东京|大阪|千叶|成田/i;
 
-  // 4. 清理多余字段
-  delete fixed["proxy-providers"];
+  // 兼容节点为字符串或对象两种情况
+  const hasJpNode = config.proxies.some(p => {
+    const name = typeof p === "string" ? p : (p && p.name);
+    return typeof name === "string" && jpRegex.test(name);
+  });
 
-  return fixed;
+  const jpGroup = {
+    name: "日本节点",
+    type: "url-test",
+    "include-all": true,
+    filter: "(?i)🇯🇵|JP|Japan|日本|东京|大阪|千叶|成田",
+    url: "https://www.gstatic.com/generate_204",
+    interval: 300,
+    tolerance: 50,
+    timeout: 3000,
+    lazy: true,
+    icon: "https://fastly.jsdelivr.net/gh/Koolson/Qure/IconSet/Color/Japan.png"
+  };
+
+  // 没有日本节点时，关闭 include-all 并强制指定 DIRECT
+  if (!hasJpNode) {
+    jpGroup["include-all"] = false;
+    jpGroup.proxies = ["DIRECT"];
+  }
+
+  config["proxy-groups"] = [
+    {
+      name: "节点选择",
+      type: "select",
+      proxies: ["日本节点", "手动选择", "DIRECT"],
+      icon: "https://fastly.jsdelivr.net/gh/Koolson/Qure/IconSet/Color/Final.png"
+    },
+    jpGroup,
+    {
+      name: "手动选择",
+      type: "select",
+      "include-all": true,
+      icon: "https://fastly.jsdelivr.net/gh/Koolson/Qure/IconSet/Color/Global.png"
+    }
+  ];
+
+  // ==================== 极简规则 ====================
+  config.rules = [
+    "DST-PORT,123,DIRECT",
+    "GEOIP,private,DIRECT,no-resolve",
+    "GEOIP,lan,DIRECT,no-resolve",
+    "GEOSITE,private,DIRECT",
+    "GEOSITE,tiktok,日本节点",
+    "GEOSITE,wechat,DIRECT",
+    "DOMAIN-KEYWORD,testflight,节点选择",
+    "GEOSITE,apple,DIRECT",
+    "GEOSITE,cn,DIRECT",
+    "GEOIP,CN,DIRECT,no-resolve",
+    "GEOSITE,geolocation-!cn,节点选择",
+    "MATCH,节点选择"
+  ];
+
+  return config;
 }
