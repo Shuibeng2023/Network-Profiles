@@ -10,14 +10,9 @@ function main(config) {
   config["unified-delay"] = true;
   config["tcp-concurrent"] = true;
 
-  // ==================== 2. TUN + MIPS ====================
+  // ==================== 2. TUN 模式（已关闭） ====================
   config.tun = {
-    enable: false,
-    stack: "mips",
-    "auto-route": true,
-    "auto-detect-interface": true,
-    "strict-route": true,
-    "dns-hijack": ["any:53"]
+    enable: false
   };
 
   config.profile = {
@@ -161,7 +156,6 @@ function main(config) {
       name: "日本节点",
       type: "url-test",
       "include-all": true,
-      // 完美匹配重命名后的节点名称
       filter: "(?i)日本",
       url: "https://www.gstatic.com/generate_204",
       interval: 300,
