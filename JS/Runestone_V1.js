@@ -6,7 +6,7 @@ function main(config) {
   // ==================== 1. 基础设置 ====================
   config.mode = "rule";
   config["log-level"] = "warning";
-  config.ipv6 = true;
+  config.ipv6 = false; // 与下方 dns.ipv6=false 保持一致，避免半启用状态
   config["unified-delay"] = true;
   config["tcp-concurrent"] = true;
 
@@ -135,6 +135,7 @@ function main(config) {
       name: "AI自动容灾",
       type: "fallback",
       "include-all": true,
+      filter: "(?i)日本", // 补上地区过滤，确保只在日本节点间容灾，不受订阅变化影响
       url: "https://www.gstatic.com/generate_204",
       interval: 180,
       timeout: 3000,
@@ -190,6 +191,7 @@ function main(config) {
     "DOMAIN-KEYWORD,chatgpt,AI策略",
     "GEOSITE,claude,AI策略",
     "DOMAIN-KEYWORD,claude,AI策略",
+    "DOMAIN-KEYWORD,copilot,AI策略",
 
     // 指定服务与媒体刮削分流
     "DOMAIN-KEYWORD,tiktok,日本节点",
@@ -201,10 +203,33 @@ function main(config) {
     "DOMAIN-KEYWORD,tmdb,节点选择",
     "DOMAIN-KEYWORD,themoviedb,节点选择",
 
+    // 防谷歌送中：显式声明走代理，避免极端情况下无域名信息的连接被GEOIP,CN误判直连
+    "GEOSITE,google,节点选择",
+
     // 国内应用与直连
     "GEOSITE,wechat,DIRECT",
     "DOMAIN-KEYWORD,servicewechat,DIRECT",
     "GEOSITE,apple,DIRECT",
+
+    // 国内云厂商/CDN基础设施补充：覆盖未被geosite,cn收录的小众App，减少落入慢速GEOIP判断的概率
+    "DOMAIN-SUFFIX,aliyuncs.com,DIRECT",
+    "DOMAIN-SUFFIX,alicdn.com,DIRECT",
+    "DOMAIN-SUFFIX,myqcloud.com,DIRECT",
+    "DOMAIN-SUFFIX,gtimg.com,DIRECT",
+    "DOMAIN-SUFFIX,qpic.cn,DIRECT",
+    "DOMAIN-SUFFIX,bdstatic.com,DIRECT",
+    "DOMAIN-SUFFIX,bdimg.com,DIRECT",
+    "DOMAIN-SUFFIX,baidubce.com,DIRECT",
+    "DOMAIN-SUFFIX,byteimg.com,DIRECT",
+    "DOMAIN-SUFFIX,volces.com,DIRECT",
+    "DOMAIN-SUFFIX,hdslb.com,DIRECT",
+    "DOMAIN-SUFFIX,qiniucdn.com,DIRECT",
+    "DOMAIN-SUFFIX,clouddn.com,DIRECT",
+    "DOMAIN-SUFFIX,upyun.com,DIRECT",
+    "DOMAIN-SUFFIX,wscdns.com,DIRECT",
+    "DOMAIN-SUFFIX,wscloudcdn.com,DIRECT",
+    "DOMAIN-SUFFIX,ksyun.com,DIRECT",
+
     "GEOSITE,cn,DIRECT",
     "GEOIP,CN,DIRECT,no-resolve",
 
