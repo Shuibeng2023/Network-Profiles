@@ -1,7 +1,7 @@
 // ========================================
 // Clash 覆写脚本（优化版）
-// 手动选节点 + 精准国内外分流 + DNS 防泄漏 + 节点干净重命名
-// 适用：Clash Verge Rev / Mihomo Party / FlClash 等支持 JS 覆写的客户端
+// 自动最低延迟 + 手动选择 + 精准分流 + DNS 防泄漏
+// 适用：Clash Verge Rev / Mihomo Party / FlClash 等
 // ========================================
 
 function main(config) {
@@ -51,26 +51,22 @@ function main(config) {
       "workgroup"
     ],
 
-    // 解析 DNS 服务器域名本身（必须国内可达）
     "default-nameserver": [
       "223.5.5.5",
       "119.29.29.29"
     ],
 
-    // 代理节点域名解析（走国内加密 DNS，避免套娃）
     "proxy-server-nameserver": [
       "https://dns.alidns.com/dns-query",
       "https://doh.pub/dns-query",
       "223.5.5.5"
     ],
 
-    // 默认解析（国外域名走这里更干净）
     nameserver: [
       "https://1.1.1.1/dns-query",
       "https://dns.google/dns-query"
     ],
 
-    // 国内 / 私有域名强制用国内 DoH（防污染 + 速度）
     "nameserver-policy": {
       "geosite:cn,private,apple": [
         "https://dns.alidns.com/dns-query",
@@ -87,7 +83,6 @@ function main(config) {
       ]
     },
 
-    // fallback 仅作为补充（fake-ip 模式下作用有限，保留即可）
     fallback: [
       "https://1.1.1.1/dns-query",
       "https://dns.google/dns-query"
@@ -107,13 +102,11 @@ function main(config) {
   if (config.proxies && config.proxies.length > 0) {
     const counter = {};
 
-    // 过滤机场提示节点
     config.proxies = config.proxies.filter(proxy => {
       const name = proxy.name || "";
       return !/(剩余|到期|套餐|流量|官网|通知|过期|重置|更新|网址|电报|TG|订阅)/i.test(name);
     });
 
-    // 地区识别 + 干净重命名
     config.proxies.forEach(proxy => {
       let region = "其他";
       const name = proxy.name || "";
@@ -148,19 +141,30 @@ function main(config) {
     });
   }
 
-  // ========== 3. 只保留一个手动选择组 ==========
+  // ========== 3. 策略组：自动最低延迟 + 手动选择 ==========
   const allProxies = (config.proxies || []).map(p => p.name);
 
   config["proxy-groups"] = [
     {
+      name: "自动选择",
+      type: "url-test",
+      proxies: allProxies.length > 0 ? allProxies : ["DIRECT"],
+      url: "https://www.gstatic.com/generate_204",
+      interval: 300,
+      tolerance: 50,
+      lazy: true,
+      timeout: 3000,
+      icon: "https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Auto.png"
+    },
+    {
       name: "节点选择",
       type: "select",
-      proxies: ["DIRECT", ...allProxies],
+      proxies: ["自动选择", "DIRECT", ...allProxies],
       icon: "https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/Proxy.png"
     }
   ];
 
-  // ========== 4. 规则集（提升分流精度）==========
+  // ========== 4. 规则集 ==========
   config["rule-providers"] = {
     reject: {
       type: "http",
@@ -227,9 +231,8 @@ function main(config) {
     }
   };
 
-  // ========== 5. 分流规则（顺序很重要）==========
+  // ========== 5. 分流规则 ==========
   config.rules = [
-    // --- 局域网 / 私有 ---
     "RULE-SET,private,DIRECT",
     "RULE-SET,lancidr,DIRECT,no-resolve",
     "IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
@@ -240,10 +243,8 @@ function main(config) {
     "IP-CIDR,100.64.0.0/10,DIRECT,no-resolve",
     "GEOIP,private,DIRECT,no-resolve",
 
-    // --- 广告拦截 ---
     "RULE-SET,reject,REJECT",
 
-    // --- 明确需要代理的服务（优先）---
     "DOMAIN-SUFFIX,openai.com,节点选择",
     "DOMAIN-SUFFIX,chatgpt.com,节点选择",
     "DOMAIN-SUFFIX,anthropic.com,节点选择",
@@ -265,7 +266,6 @@ function main(config) {
     "DOMAIN-KEYWORD,telegram,节点选择",
     "RULE-SET,telegramcidr,节点选择,no-resolve",
 
-    // --- 国内高频直连（加速匹配）---
     "DOMAIN-SUFFIX,cn,DIRECT",
     "DOMAIN-SUFFIX,qq.com,DIRECT",
     "DOMAIN-SUFFIX,weixin.qq.com,DIRECT",
@@ -296,20 +296,17 @@ function main(config) {
     "DOMAIN-SUFFIX,icloud.com,DIRECT",
     "DOMAIN-SUFFIX,mzstatic.com,DIRECT",
 
-    // --- 规则集分流 ---
     "RULE-SET,gfw,节点选择",
     "RULE-SET,tld-not-cn,节点选择",
     "RULE-SET,proxy,节点选择",
     "RULE-SET,direct,DIRECT",
 
-    // --- Geo 兜底 ---
     "GEOSITE,cn,DIRECT",
     "GEOSITE,apple,DIRECT",
     "GEOSITE,microsoft@cn,DIRECT",
     "RULE-SET,cncidr,DIRECT,no-resolve",
     "GEOIP,CN,DIRECT,no-resolve",
 
-    // --- 最终兜底 ---
     "MATCH,节点选择"
   ];
 
@@ -318,7 +315,7 @@ function main(config) {
     enable: true,
     "force-dns-mapping": true,
     "parse-pure-ip": true,
-    "override-destination": false,   // false 更稳，减少部分 App 异常
+    "override-destination": false,
     sniff: {
       TLS: {
         ports: [443, 8443]
