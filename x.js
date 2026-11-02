@@ -1,6 +1,6 @@
 // ========================================
-// Clash 覆写脚本（日本节点精简优化版）
-// 自动最低延迟 + 日本旗帜图标 + 精准分流 + DNS 防泄漏
+// Clash 覆写脚本（日本节点精简精准优化版 v2）
+// 自动最低延迟 + 日本旗帜图标 + 高精度分流 + DNS 防泄漏 + 广告拦截
 // 适用：Clash Verge Rev / Mihomo Party / FlClash 等
 // ========================================
 
@@ -14,21 +14,23 @@ function main(config) {
   config["find-process-mode"] = "off";
   config["log-level"] = "warning";
   config["global-client-fingerprint"] = "chrome";
+  config["geodata-mode"] = true;
 
   if (!config.profile) config.profile = {};
   config.profile["store-selected"] = true;
   config.profile["store-fake-ip"] = true;
 
-  // ========== 1. DNS（隐私重点）==========
+  // ========== 1. DNS（隐私重点优化）==========
   config.dns = {
     enable: true,
-    listen: "0.0.0.0:1053",
+    listen: "127.0.0.1:1053",          // 仅本机，更安全
     ipv6: false,
     "enhanced-mode": "fake-ip",
     "fake-ip-range": "198.18.0.1/16",
     "prefer-h3": true,
     "use-hosts": true,
     "cache-algorithm": "arc",
+    "respect-rules": true,             // 关键：遵循规则，更好防泄漏
 
     "fake-ip-filter": [
       "+.lan",
@@ -58,8 +60,7 @@ function main(config) {
 
     "proxy-server-nameserver": [
       "https://dns.alidns.com/dns-query",
-      "https://doh.pub/dns-query",
-      "223.5.5.5"
+      "https://doh.pub/dns-query"
     ],
 
     nameserver: [
@@ -100,29 +101,35 @@ function main(config) {
 
   // ========== 2. 节点过滤 + 日本重命名 ==========
   if (config.proxies && config.proxies.length > 0) {
-    // 过滤掉无关节点
+    // 过滤垃圾信息节点
     config.proxies = config.proxies.filter(proxy => {
       const name = proxy.name || "";
       return !/(剩余|到期|套餐|流量|官网|通知|过期|重置|更新|网址|电报|TG|订阅)/i.test(name);
     });
 
-    // 统一重命名为 日本 01、日本 02...
+    // 统一重命名（保留简单编号）
     config.proxies.forEach((proxy, index) => {
       const num = String(index + 1).padStart(2, "0");
       proxy.name = `日本 ${num}`;
     });
   }
 
-  // ========== 3. 策略组（精简 + 日本旗帜）==========
+  // ========== 3. 策略组（精简实用）==========
   const allProxies = (config.proxies || []).map(p => p.name);
 
   config["proxy-groups"] = [
+    {
+      name: "日本节点",
+      type: "select",
+      proxies: allProxies.length > 0 ? allProxies : ["DIRECT"],
+      icon: "https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/Japan.png"
+    },
     {
       name: "AUTO",
       type: "url-test",
       proxies: allProxies.length > 0 ? allProxies : ["DIRECT"],
       url: "http://www.gstatic.com/generate_204",
-      interval: 300,
+      interval: 600,          // 10分钟测一次，更省流量
       tolerance: 50,
       lazy: true,
       timeout: 3000,
@@ -131,97 +138,117 @@ function main(config) {
     {
       name: "PROXY",
       type: "select",
-      proxies: ["AUTO", "DIRECT", ...allProxies],
+      proxies: ["AUTO", "日本节点", "DIRECT"],
       icon: "https://raw.githubusercontent.com/Koolson/Qure/master/IconSet/Color/JP.png"
     }
   ];
 
-  // ========== 4. 规则集 ==========
+  // ========== 4. 高精度远程规则集 (Meta 官方核心源) ==========
   config["rule-providers"] = {
     private: {
       type: "http",
       behavior: "domain",
-      url: "https://fastly.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/private.txt",
-      path: "./ruleset/private.yaml",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/private.mrs",
+      path: "./ruleset/private.mrs",
+      interval: 86400
+    },
+    cn: {
+      type: "http",
+      behavior: "domain",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/cn.mrs",
+      path: "./ruleset/cn.mrs",
+      interval: 86400
+    },
+    "cn-ip": {
+      type: "http",
+      behavior: "ipcidr",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geoip/cn.mrs",
+      path: "./ruleset/cn-ip.mrs",
+      interval: 86400
+    },
+    "ads-all": {
+      type: "http",
+      behavior: "domain",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ads-all.mrs",
+      path: "./ruleset/ads-all.mrs",
+      interval: 86400
+    },
+    tracker: {
+      type: "http",
+      behavior: "domain",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/tracker.mrs",
+      path: "./ruleset/tracker.mrs",
+      interval: 86400
+    },
+    ai: {
+      type: "http",
+      behavior: "domain",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/category-ai-!cn.mrs",
+      path: "./ruleset/ai.mrs",
+      interval: 86400
+    },
+    gfw: {
+      type: "http",
+      behavior: "domain",
+      format: "mrs",
+      url: "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/meta/geo/geosite/gfw.mrs",
+      path: "./ruleset/gfw.mrs",
       interval: 86400
     }
   };
 
-  // ========== 5. 分流规则（最终优化版）==========
+  // ========== 5. 分流规则（精准防误判版）==========
   config.rules = [
-    // 局域网 + 基础
-    "DST-PORT,123,DIRECT",
-    "GEOIP,private,DIRECT,no-resolve",
-    "GEOSITE,private,DIRECT",
+    // 1. 局域网与私有地址直连
+    "RULE-SET,private,DIRECT",
 
-    // AI
-    "GEOSITE,category-ai-!cn,PROXY",
+    // 2. PT / BT 下载走直连，保护流量与防风控
+    "RULE-SET,tracker,DIRECT,no-resolve",
 
-    // 油管、奈飞等
+    // 3. 广告拦截（高优先级过滤垃圾弹窗）
+    "RULE-SET,ads-all,REJECT",
+
+    // 4. AI 服务走日本节点
+    "RULE-SET,ai,AUTO",
+
+    // 5. 常见海外主流平台（流媒体、社交、工具统一走日本自动节点）
     "GEOSITE,youtube,AUTO",
     "GEOSITE,netflix,AUTO",
-    "GEOIP,netflix,AUTO,no-resolve",
     "GEOSITE,disney,AUTO",
-    "GEOSITE,hbo,AUTO",
-    "GEOSITE,primevideo,AUTO",
-    "GEOSITE,hulu,AUTO",
-    "GEOSITE,spotify,AUTO",
-    "GEOSITE,tiktok,AUTO",
-    "GEOSITE,twitch,AUTO",
-    "GEOSITE,bahamut,AUTO",
-    "GEOSITE,biliintl,AUTO",
     "GEOSITE,telegram,AUTO",
-    "GEOIP,telegram,AUTO,no-resolve",
-
-    // 游戏
-    "GEOSITE,steam,AUTO",
-    "GEOSITE,epicgames,AUTO",
-    "GEOSITE,nintendo,AUTO",
-    "GEOSITE,sony,AUTO",
-    "GEOSITE,origin,AUTO",
-
-    // 开发
     "GEOSITE,github,AUTO",
+    "GEOSITE,google,AUTO",
 
-    // 苹果 / 微软 / B站
+    // 6. 国内大厂及基础服务强制直连
+    "RULE-SET,cn,DIRECT",
     "GEOSITE,apple,DIRECT",
     "GEOSITE,microsoft,DIRECT",
     "GEOSITE,bilibili,DIRECT",
+    "GEOSITE,category-games@cn,DIRECT",   // 国内游戏直连
 
-    // Google 推送
-    "GEOSITE,googlefcm,AUTO",
-
-    // ========== 国内直连加强 ==========
-    "GEOSITE,cn,DIRECT",
-    "GEOIP,CN,DIRECT",
-    "GEOSITE,alibaba,DIRECT",
-    "GEOSITE,tencent,DIRECT",
-    "GEOSITE,bytedance,DIRECT",
-    "GEOSITE,baidu,DIRECT",
-    "GEOSITE,netease,DIRECT",
-    "GEOSITE,jd,DIRECT",
-    "GEOSITE,meituan,DIRECT",
-    "GEOSITE,pinduoduo,DIRECT",
-    "GEOSITE,kuaishou,DIRECT",
-    "GEOSITE,iqiyi,DIRECT",
-    "GEOSITE,youku,DIRECT",
-    "GEOSITE,xiaohongshu,DIRECT",
-    "GEOSITE,douyin,DIRECT",
-    "GEOSITE,zhihu,DIRECT",
-    "GEOSITE,weibo,DIRECT",
-    "GEOSITE,category-games@cn,DIRECT",
-
-    // 最终规则
+    // 7. GFW 列表与海外未中国化网站走代理
+    "RULE-SET,gfw,AUTO",
     "GEOSITE,geolocation-!cn,AUTO",
+
+    // 8. 国内 IP 兜底直连
+    "RULE-SET,cn-ip,DIRECT,no-resolve",
+
+    // 9. 最终兜底
     "MATCH,AUTO"
   ];
 
-  // ========== 6. 嗅探 ==========
+  // ========== 6. 嗅探（优化）==========
   config.sniffer = {
     enable: true,
     "force-dns-mapping": true,
     "parse-pure-ip": true,
-    "override-destination": false,
+    "override-destination": true,     // 开启后规则匹配更准确
     sniff: {
       TLS: {
         ports: [443, 8443]
