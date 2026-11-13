@@ -1,0 +1,27 @@
+# ==============================
+# DNS Leak & IP Anonymity Test
+# ==============================
+
+# 经典 DNS 与综合泄漏测试
+DOMAIN-SUFFIX,dnsleaktest.com
+DOMAIN-SUFFIX,dnsleak.com
+DOMAIN-SUFFIX,ipleak.net
+DOMAIN-SUFFIX,whoer.net
+DOMAIN-SUFFIX,whrq.net
+
+# 浏览器高级指纹与泄漏测试
+DOMAIN-SUFFIX,browserleaks.com
+DOMAIN-SUFFIX,browserleaks.net
+DOMAIN-SUFFIX,browserleaks.org
+DOMAIN-SUFFIX,perfect-privacy.com
+
+# 高效 IP 与网络出口查询（新增推荐）
+DOMAIN-SUFFIX,ip.sb
+DOMAIN-SUFFIX,ipinfo.io
+DOMAIN-SUFFIX,dnschecker.org
+
+# 商业 VPN 官网站点（走代理访问）
+DOMAIN-SUFFIX,expressvpn.com
+DOMAIN-SUFFIX,nordvpn.com
+DOMAIN-SUFFIX,surfshark.com
+DOMAIN-SUFFIX,vpnunlimited.com
