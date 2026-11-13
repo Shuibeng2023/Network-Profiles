@@ -1,0 +1,19 @@
+# ==============================
+# Apple Custom & Core Rules
+# ==============================
+
+# Apple 核心 IPv4/IPv6 网段
+IP-CIDR,17.0.0.0/8,no-resolve
+IP-CIDR,2620:149::/32,no-resolve
+IP-CIDR,2403:300::/32,no-resolve
+IP-CIDR,2A01:B740::/32,no-resolve
+
+# Apple 核心服务与 CDN 域名
+DOMAIN-SUFFIX,apple.com
+DOMAIN-SUFFIX,icloud.com
+DOMAIN-SUFFIX,icloud-content.com
+DOMAIN-SUFFIX,mzstatic.com
+DOMAIN-SUFFIX,cdn-apple.com
+DOMAIN-SUFFIX,me.com
+DOMAIN-SUFFIX,appstore.com
+DOMAIN-SUFFIX,smoot.apple.com
